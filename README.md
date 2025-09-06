@@ -1,0 +1,2 @@
+# astrbot_plugin_banshi_administrator
+搬史群管理源代码公示
