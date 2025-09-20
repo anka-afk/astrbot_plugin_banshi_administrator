@@ -153,8 +153,10 @@ class DuplicateDetector:
         if not message_chain:
             return None
 
-        supported_types = {"plain", "text", "image", "video", "record", "forward"}
+        supported_types = {"plain", "text", "image", "video", "forward"}
         text_contents = []
+        media_contents = []
+        forward_content = None
 
         for segment in message_chain:
             component_type = self._get_component_type(segment)
@@ -166,18 +168,59 @@ class DuplicateDetector:
                 text = self._get_text_content(segment)
                 if text and text.strip():
                     text_contents.append(text.strip())
-            elif component_type in ["image", "video", "record"]:
+            elif component_type in ["image", "video"]:
                 media_info = self._extract_media_content(segment, component_type)
                 if media_info:
-                    return media_info
+                    media_contents.append(media_info[0])
             elif component_type == "forward":
                 forward_info = self._extract_forward_content(segment)
                 if forward_info:
-                    return forward_info
+                    forward_content = forward_info
+                    break  # 转发消息优先处理，直接返回
 
+        # 如果有转发消息，直接返回转发消息信息
+        if forward_content:
+            return forward_content
+
+        # 构建混合内容的哈希值和预览
+        content_parts = []
+        preview_parts = []
+        message_type = "mixed"
+
+        # 添加文字内容
         if text_contents:
             full_text = " ".join(text_contents)
-            return full_text, "text", f"文本:{full_text[:50]}..."
+            content_parts.append(f"text:{full_text}")
+            preview_parts.append(f"文本:{full_text[:30]}")
+            if not media_contents:  # 纯文字消息
+                message_type = "text"
+
+        # 添加媒体内容
+        if media_contents:
+            content_parts.extend(media_contents)
+            # 统计各种媒体类型
+            media_types = []
+            for media in media_contents:
+                media_type = media.split(":", 1)[0]
+                if media_type not in media_types:
+                    media_types.append(media_type)
+
+            type_names = {
+                "image": "图片",
+                "video": "视频",
+                "record": "语音",
+            }
+            media_display = "+".join([type_names.get(t, t) for t in media_types])
+            preview_parts.append(media_display)
+
+            if not text_contents:  # 纯媒体消息
+                message_type = media_types[0] if len(media_types) == 1 else "mixed"
+
+        if content_parts:
+            # 使用所有内容部分生成哈希值
+            content_hash = "|".join(sorted(content_parts))  # 排序确保一致性
+            preview = "+".join(preview_parts)
+            return content_hash, message_type, preview
 
         return None
 
