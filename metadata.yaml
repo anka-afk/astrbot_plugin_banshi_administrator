@@ -1,0 +1,6 @@
+name: banshi_administrator
+desc: 搬史群管理插件，提供宵禁和重复消息检测功能
+help: 无
+version: v1.0
+author: anka
+repo: https://github.com/anka/astrbot_plugin_banshi_administrator

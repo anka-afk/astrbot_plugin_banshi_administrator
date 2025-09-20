@@ -1,0 +1,26 @@
+{
+  "platform_name": {
+    "description": "平台名称",
+    "hint": "填写的平台名称",
+    "type": "string",
+    "default": "napcat"
+  },
+  "curfew_list": {
+    "description": "宵禁名单",
+    "hint": "宵禁群名单",
+    "type": "list",
+    "default": []
+  },
+  "curfew_time": {
+    "description": "宵禁时间",
+    "hint": "宵禁开始时间，格式为HH:mm。支持 24:00 表示午夜",
+    "type": "string",
+    "default": "24:00"
+  },
+  "curfew_last": {
+    "description": "宵禁持续时间",
+    "hint": "宵禁持续时间，单位为小时",
+    "type": "int",
+    "default": 8
+  }
+}
