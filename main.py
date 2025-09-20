@@ -76,6 +76,12 @@ class Administrator(Star):
 
         except Exception as e:
             logger.error(f"处理群消息时发生错误: {e}", exc_info=True)
+        # 屏蔽列表中的群消息
+        group_id = event.message_obj.group_id
+        curfew_list = self.config.get("curfew_list", [])
+        if str(group_id) in curfew_list:
+            logger.info(f"群 {group_id} 在列表中，跳过 llm 处理")
+            event.stop_event()
 
     def _is_system_event(self, event: AstrMessageEvent) -> bool:
         """检查是否为系统事件"""
