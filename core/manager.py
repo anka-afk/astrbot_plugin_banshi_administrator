@@ -96,3 +96,28 @@ class DetectorManager:
         """判断是否应该跳过LLM处理"""
         curfew_list = self.config.get("curfew_list", [])
         return str(group_id) in curfew_list
+
+    async def check_duplicate_message(self, event: AstrMessageEvent) -> bool:
+        """专门检查重复消息"""
+        try:
+            if hasattr(self, "duplicate_detector") and self.duplicate_detector:
+                return await self.duplicate_detector.check(event)
+            return False
+        except Exception as e:
+            logger.error(f"重复消息检测失败: {e}", exc_info=True)
+            return False
+
+    async def check_other_detectors(self, event: AstrMessageEvent) -> bool:
+        """检查除重复消息外的其他检测器"""
+        try:
+            # 执行聊天检测等其他检测器
+            if hasattr(self, "chat_detector") and self.chat_detector:
+                chat_result = await self.chat_detector.check(event)
+                if chat_result:
+                    return True
+
+            # 可以在这里添加其他检测器
+            return False
+        except Exception as e:
+            logger.error(f"其他检测器检查失败: {e}", exc_info=True)
+            return False

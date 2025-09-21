@@ -45,6 +45,7 @@ class ChatDetector(BaseDetector):
                     group_id, user_id, event.message_obj.message_id
                 )
                 logger.info(f"检测到用户 {user_id} 发送纯聊天内容，已禁言30分钟")
+                event.stop_event()
                 return True
 
             return False

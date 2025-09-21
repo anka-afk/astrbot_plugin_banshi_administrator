@@ -154,7 +154,8 @@ class DuplicateDetector(BaseDetector):
             if component_type in ["plain", "text"]:
                 text = self._get_text_content(segment)
                 if text and text.strip():
-                    text_contents.append(text.strip())
+                    normalized_text = " ".join(text.strip().split())
+                    text_contents.append(normalized_text)
             elif component_type in ["image", "video"]:
                 media_info = self._extract_media_content(segment, component_type)
                 if media_info:
@@ -176,6 +177,7 @@ class DuplicateDetector(BaseDetector):
 
         if text_contents:
             full_text = " ".join(text_contents)
+            # 使用更稳定的哈希方法
             content_parts.append(f"text:{full_text}")
             preview_parts.append(f"文本:{full_text[:30]}")
             if not media_contents:
@@ -197,8 +199,12 @@ class DuplicateDetector(BaseDetector):
                 message_type = media_types[0] if len(media_types) == 1 else "mixed"
 
         if content_parts:
+            # 确保内容哈希的一致性
             content_hash = "|".join(sorted(content_parts))
             preview = "+".join(preview_parts)
+            logger.debug(
+                f"提取的消息内容 - 类型: {message_type}, 哈希: {content_hash[:50]}..., 预览: {preview}"
+            )
             return content_hash, message_type, preview
 
         return None

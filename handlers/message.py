@@ -19,11 +19,16 @@ class MessageHandler:
             if self._is_system_event(event):
                 return
 
-            # 执行消息检测
-            is_blocked = await self.detector_manager.check_message(event)
+            # 优先执行重复消息检测
+            is_duplicate = await self.detector_manager.check_duplicate_message(event)
+            if is_duplicate:
+                logger.info(f"群 {event.message_obj.group_id} 检测到重复消息，已处理")
+                event.stop_event()  # 停止后续处理
+                return
 
-            if not is_blocked:
-                logger.debug(f"群 {event.message_obj.group_id} 中的消息通过所有检测")
+            is_blocked = await self.detector_manager.check_other_detectors(event)
+            if is_blocked:
+                logger.info(f"群 {event.message_obj.group_id} 消息被其他检测器拦截")
 
             # 判断是否跳过LLM处理
             group_id = event.message_obj.group_id
