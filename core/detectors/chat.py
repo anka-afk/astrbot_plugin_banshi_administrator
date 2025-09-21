@@ -65,9 +65,9 @@ class ChatDetector(BaseDetector):
             if len(message_text) < min_length:
                 return False
 
-            # 过滤明显的非聊天内容
-            if self._is_obviously_not_chat(message_text):
-                return False
+            # 明显的聊天内容
+            if self._is_obviously_chat(message_text):
+                return True
 
             # 使用 LLM 进行判断
             is_forward = await self._is_forward_content(event, message_text)
@@ -200,8 +200,8 @@ class ChatDetector(BaseDetector):
         logger.warning(f"无法解析 LLM 响应: '{response_text}'，默认为转发文案")
         return True
 
-    def _is_obviously_not_chat(self, message_text: str) -> bool:
-        """快速判断明显不是聊天的内容"""
+    def _is_obviously_chat(self, message_text: str) -> bool:
+        """快速判断明显是聊天的内容"""
         # 机器人指令
         if message_text.startswith(("//", "/", "!", "！", ".")):
             return True
