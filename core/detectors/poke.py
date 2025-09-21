@@ -54,13 +54,13 @@ class PokeDetector(BaseDetector):
         """检查消息链中是否包含戳一戳消息"""
         for segment in message_chain:
             component_type = self.get_component_type(segment)
-            if component_type == "poke":
+            # 检查组件类型是否为 Poke
+            if component_type == "Poke":
                 return True
 
-            # 检查类型字符串
             if hasattr(segment, "type"):
                 type_str = str(getattr(segment, "type", ""))
-                if "poke" in type_str.lower():
+                if type_str.startswith("Poke:"):
                     return True
 
         return False
