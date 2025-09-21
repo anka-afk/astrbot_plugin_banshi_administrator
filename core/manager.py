@@ -1,12 +1,12 @@
 from typing import Dict, Optional, TYPE_CHECKING
 from astrbot.api import logger
+from astrbot.api.event import AstrMessageEvent
 from .detectors.curfew import CurfewManager
 from .detectors.duplicate import DuplicateDetector
 from .detectors.chat import ChatDetector
 from .detectors.poke import PokeDetector
 
 if TYPE_CHECKING:
-    from astrbot.api.event import AstrMessageEvent
     from ..main import Administrator
 
 

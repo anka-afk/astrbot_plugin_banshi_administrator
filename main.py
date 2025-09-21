@@ -47,8 +47,7 @@ class Administrator(Star):
         except Exception as e:
             logger.error(f"插件初始化失败: {e}", exc_info=True)
 
-    @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE)
-    @filter.priority(100000)
+    @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE, priority=10000000)
     async def handle_group_message(self, event: AstrMessageEvent):
         """处理群消息"""
         await self.message_handler.handle_group_message(event)
