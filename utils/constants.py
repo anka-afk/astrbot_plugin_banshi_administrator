@@ -1,18 +1,5 @@
 """常量定义"""
 
-# 默认配置
-DEFAULT_CONFIG = {
-    "platform_name": "napcat",
-    "curfew_list": [],
-    "curfew_time": "24:00",
-    "curfew_last": 8,
-    "enable_chat_detection": True,
-    "chat_detection_min_length": 1,
-    "chat_group_hint": "请前往聊天群聊天",
-    "enable_poke_detection": True,
-    "poke_warning_message": "⚠️ 检测到戳一戳消息，已禁言3小时。请不要使用戳一戳功能。此消息将在1分钟后撤回。",
-}
-
 # 禁言时长（秒）
 BAN_DURATIONS = {
     "text": 600,  # 文本重复：10分钟
@@ -52,3 +39,6 @@ DUPLICATE_CHECK_WINDOW = 24
 
 # 数据库记录保留时间（小时）
 DB_RECORD_RETENTION = 25
+
+# 默认禁言时长（秒）
+DEFAULT_BAN_DURATION = 600  # 10分钟

@@ -1,22 +1,7 @@
 """群管理规则配置模块"""
 
 from typing import Tuple
-
-# 默认禁言时长（秒）
-DEFAULT_BAN_DURATION = 600  # 10分钟
-
-# 重复消息检测时间窗口（小时）
-DUPLICATE_CHECK_WINDOW = 24
-
-# 消息类型映射
-MESSAGE_TYPE_NAMES = {
-    "text": "文本",
-    "image": "图片",
-    "video": "视频",
-    "forward": "聊天记录",
-    "audio": "语音",
-    "file": "文件",
-}
+from .constants import BAN_DURATIONS, MESSAGE_TYPE_NAMES, DEFAULT_BAN_DURATION
 
 
 class AdminRules:
@@ -25,15 +10,7 @@ class AdminRules:
     @staticmethod
     def get_ban_duration(message_type: str) -> int:
         """根据消息类型获取禁言时长（秒）"""
-        durations = {
-            "text": 600,  # 文本重复：10分钟
-            "image": 600,  # 图片重复：10分钟
-            "video": 900,  # 视频重复：15分钟
-            "forward": 300,  # 聊天记录重复：5分钟
-            "audio": 600,  # 语音重复：10分钟
-            "file": 600,  # 文件重复：10分钟
-        }
-        return durations.get(message_type, DEFAULT_BAN_DURATION)
+        return BAN_DURATIONS.get(message_type, DEFAULT_BAN_DURATION)
 
     @staticmethod
     def get_warning_message(message_type: str) -> str:
@@ -86,3 +63,31 @@ class AdminRules:
             return False, str(e)
         except Exception as e:
             return False, f"配置验证失败: {str(e)}"
+
+    @staticmethod
+    def is_command_message(text: str) -> bool:
+        """判断是否为指令消息"""
+        if not text:
+            return False
+        command_prefixes = ["//", "/", "!", "！", ".", "。"]
+        return any(text.startswith(prefix) for prefix in command_prefixes)
+
+    @staticmethod
+    def format_duration(seconds: int) -> str:
+        """格式化时长"""
+        if seconds < 60:
+            return f"{seconds}秒"
+        elif seconds < 3600:
+            return f"{seconds // 60}分钟"
+        elif seconds < 86400:
+            hours = seconds // 3600
+            minutes = (seconds % 3600) // 60
+            if minutes > 0:
+                return f"{hours}小时{minutes}分钟"
+            return f"{hours}小时"
+        else:
+            days = seconds // 86400
+            hours = (seconds % 86400) // 3600
+            if hours > 0:
+                return f"{days}天{hours}小时"
+            return f"{days}天"

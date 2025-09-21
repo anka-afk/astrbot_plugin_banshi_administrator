@@ -3,6 +3,7 @@ from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent
 from .base import BaseDetector
 from ...utils.constants import BAN_DURATIONS, WARNING_RECALL_DELAY
+from ...utils.rules import AdminRules
 import asyncio
 
 
@@ -203,7 +204,7 @@ class ChatDetector(BaseDetector):
     def _is_obviously_chat(self, message_text: str) -> bool:
         """快速判断明显是聊天的内容"""
         # 机器人指令
-        if message_text.startswith(("//", "/", "!", "！", ".")):
+        if AdminRules.is_command_message(message_text):
             return True
 
         # 纯数字或纯符号
