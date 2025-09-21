@@ -15,6 +15,12 @@ class MessageHandler:
     async def handle_group_message(self, event: AstrMessageEvent) -> None:
         """处理群消息"""
         try:
+            # 首先检查群是否在监控列表中
+            group_id = event.message_obj.group_id
+            if not self.detector_manager.should_skip_llm(group_id):
+                logger.debug(f"群 {group_id} 不在监控列表中，跳过所有检测")
+                return
+
             # 检查是否为系统事件
             if self._is_system_event(event):
                 return
@@ -31,7 +37,6 @@ class MessageHandler:
                 logger.info(f"群 {event.message_obj.group_id} 消息被其他检测器拦截")
 
             # 判断是否跳过LLM处理
-            group_id = event.message_obj.group_id
             if self.detector_manager.should_skip_llm(group_id):
                 logger.info(f"群 {group_id} 在监控列表中，跳过LLM处理")
                 event.stop_event()
