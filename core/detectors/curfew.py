@@ -1,11 +1,9 @@
 import asyncio
-from typing import Dict, TYPE_CHECKING
+from typing import Dict
 from astrbot.api import logger
-from ..models.curfew_info import CurfewInfo
-from ..utils.rules import AdminRules
-
-if TYPE_CHECKING:
-    from ..main import Administrator
+from .base import BaseDetector
+from ...models.curfew_info import CurfewInfo
+from ...utils.rules import AdminRules
 
 
 class CurfewTask:
@@ -22,10 +20,7 @@ class CurfewTask:
     @property
     def bot(self):
         """获取bot实例"""
-        platform = self.manager.administrator.platform
-        if platform and hasattr(platform, "bot"):
-            return platform.bot
-        return None
+        return self.manager.bot
 
     def is_running(self) -> bool:
         """检查任务是否正在运行"""
@@ -88,12 +83,12 @@ class CurfewTask:
                 break
             except Exception as e:
                 logger.error(f"群 {self.group_id} 宵禁任务异常: {e}", exc_info=True)
-                await asyncio.sleep(60)  # 出错后等待1分钟重试
+                await asyncio.sleep(60)
 
     async def _enable_curfew(self):
         """启用宵禁"""
         try:
-            # 发送宵禁开始消息（不自动撤回）
+            # 发送宵禁开始消息
             send_payloads = {
                 "group_id": self.group_id,
                 "message": f"【{self.curfew_info.start_time_str}】本群宵禁开始！",
@@ -111,7 +106,7 @@ class CurfewTask:
     async def _disable_curfew(self):
         """禁用宵禁"""
         try:
-            # 发送宵禁结束消息（不自动撤回）
+            # 发送宵禁结束消息
             send_payloads = {
                 "group_id": self.group_id,
                 "message": f"【{self.curfew_info.end_time_str}】本群宵禁结束！",
@@ -127,13 +122,24 @@ class CurfewTask:
             logger.error(f"群 {self.group_id} 宵禁解除失败: {e}")
 
 
-class CurfewManager:
+class CurfewManager(BaseDetector):
     """宵禁管理器"""
 
-    def __init__(self, administrator: "Administrator", config: dict):
-        self.administrator = administrator
-        self.config = config
+    def __init__(self, administrator, config):
+        super().__init__(administrator, config)
         self.curfew_tasks: Dict[int, CurfewTask] = {}
+
+    async def _init_impl(self) -> None:
+        """初始化实现"""
+        pass
+
+    async def _stop_impl(self) -> None:
+        """停止实现"""
+        await self.stop_all_curfews()
+
+    async def check(self, event) -> bool:
+        """宵禁管理器不需要检查消息"""
+        return False
 
     async def start_all_curfews(self):
         """启动所有宵禁任务"""

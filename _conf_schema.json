@@ -22,5 +22,35 @@
     "hint": "宵禁持续时间，单位为小时",
     "type": "int",
     "default": 8
+  },
+  "enable_chat_detection": {
+    "description": "启用聊天内容检测",
+    "hint": "启用后将使用 LLM 判断消息是否为纯聊天内容，纯聊天内容将被禁言",
+    "type": "bool",
+    "default": true
+  },
+  "chat_detection_min_length": {
+    "description": "聊天检测最小长度",
+    "hint": "消息长度小于此值时不进行聊天检测",
+    "type": "int",
+    "default": 1
+  },
+  "chat_group_hint": {
+    "description": "聊天群提示信息",
+    "hint": "检测到聊天内容时的提示信息，告知用户去哪个群聊天",
+    "type": "string",
+    "default": "请前往聊天群聊天"
+  },
+  "enable_poke_detection": {
+    "description": "启用戳一戳检测",
+    "hint": "启用后将检测戳一戳消息并进行禁言处理",
+    "type": "bool",
+    "default": true
+  },
+  "poke_warning_message": {
+    "description": "戳一戳警告消息",
+    "hint": "检测到戳一戳时发送的警告消息",
+    "type": "string",
+    "default": "⚠️ 检测到戳一戳消息，已禁言3小时。请不要使用戳一戳功能。此消息将在1分钟后撤回。"
   }
 }

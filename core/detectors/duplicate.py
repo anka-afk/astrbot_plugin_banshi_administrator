@@ -1,39 +1,30 @@
 import asyncio
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent
-from ..models.message_record import MessageRecord
-from ..utils.rules import AdminRules
+from .base import BaseDetector
+from ...models.message_record import MessageRecord
+from ...utils.rules import AdminRules
+from ...utils.constants import BAN_DURATIONS, WARNING_RECALL_DELAY, DB_CLEANUP_INTERVAL
 
-if TYPE_CHECKING:
-    from ..main import Administrator
 
-
-class DuplicateDetector:
+class DuplicateDetector(BaseDetector):
     """重复消息检测器"""
 
-    def __init__(self, administrator: "Administrator", config: dict):
-        self.administrator = administrator
-        self.config = config
+    def __init__(self, administrator, config):
+        super().__init__(administrator, config)
         self.message_record = MessageRecord()
         self._cleanup_task = None
         self._reminder_tasks = {}
 
-    @property
-    def bot(self):
-        """获取bot实例"""
-        platform = self.administrator.platform
-        if platform and hasattr(platform, "bot"):
-            return platform.bot
-        return None
-
-    async def init(self):
-        """初始化检测器"""
+    async def _init_impl(self) -> None:
+        """初始化实现"""
         await self.message_record.init_db()
         self._cleanup_task = asyncio.create_task(self._cleanup_scheduler())
 
-    async def stop(self):
-        """停止检测器"""
+    async def _stop_impl(self) -> None:
+        """停止实现"""
+        # 停止清理任务
         if self._cleanup_task and not self._cleanup_task.done():
             self._cleanup_task.cancel()
             try:
@@ -41,12 +32,13 @@ class DuplicateDetector:
             except asyncio.CancelledError:
                 pass
 
+        # 停止提醒任务
         for task in self._reminder_tasks.values():
             if not task.done():
                 task.cancel()
         self._reminder_tasks.clear()
 
-    async def check_and_handle(self, event: AstrMessageEvent) -> bool:
+    async def check(self, event: AstrMessageEvent) -> bool:
         """检查并处理重复消息"""
         try:
             if not self.bot:
@@ -56,11 +48,6 @@ class DuplicateDetector:
             user_id = event.message_obj.sender.user_id
 
             if not group_id or not user_id:
-                return False
-
-            # 检查是否在监控列表中
-            curfew_list = self.config.get("curfew_list", [])
-            if str(group_id) not in curfew_list:
                 return False
 
             # 过滤系统事件和空消息
@@ -74,11 +61,11 @@ class DuplicateDetector:
                 await self._handle_ban_and_warning(
                     group_id,
                     user_id,
-                    event.message_obj.message,
-                    10800,
+                    event.message_obj.message_id,
+                    BAN_DURATIONS.get("unknown", 10800),
                     "检测到不支持的消息类型，已禁言3小时",
                 )
-                await self._recall_user_message(event.message_obj.message_id)
+                await self.recall_message(event.message_obj.message_id)
                 return True
 
             content_hash, message_type, preview = content_info
@@ -89,12 +76,12 @@ class DuplicateDetector:
                 forward_content = await self._get_forward_message_content(forward_id)
 
                 if forward_content == "ADVERTISEMENT_DETECTED":
-                    await self._recall_user_message(event.message_obj.message_id)
+                    await self.recall_message(event.message_obj.message_id)
                     await self._handle_ban_and_warning(
                         group_id,
                         user_id,
-                        None,
-                        86400,
+                        event.message_obj.message_id,
+                        BAN_DURATIONS.get("advertisement", 86400),
                         "检测到转发消息中包含群聊推荐广告，已禁言24小时",
                     )
                     return True
@@ -109,7 +96,7 @@ class DuplicateDetector:
             )
 
             if duplicate_info:
-                await self._recall_user_message(event.message_obj.message_id)
+                await self.recall_message(event.message_obj.message_id)
                 await self._handle_duplicate_message(group_id, user_id, message_type)
                 return True
             else:
@@ -138,7 +125,7 @@ class DuplicateDetector:
             for segment in message_chain:
                 if hasattr(segment, "text") and getattr(segment, "text", "").strip():
                     return False
-                component_type = self._get_component_type(segment)
+                component_type = self.get_component_type(segment)
                 if component_type in ["image", "video", "record", "forward", "face"]:
                     return False
 
@@ -159,7 +146,7 @@ class DuplicateDetector:
         forward_content = None
 
         for segment in message_chain:
-            component_type = self._get_component_type(segment)
+            component_type = self.get_component_type(segment)
 
             if component_type not in supported_types and component_type != "unknown":
                 return None
@@ -176,66 +163,45 @@ class DuplicateDetector:
                 forward_info = self._extract_forward_content(segment)
                 if forward_info:
                     forward_content = forward_info
-                    break  # 转发消息优先处理，直接返回
+                    break
 
-        # 如果有转发消息，直接返回转发消息信息
+        # 优先返回转发消息
         if forward_content:
             return forward_content
 
-        # 构建混合内容的哈希值和预览
+        # 构建混合内容
         content_parts = []
         preview_parts = []
         message_type = "mixed"
 
-        # 添加文字内容
         if text_contents:
             full_text = " ".join(text_contents)
             content_parts.append(f"text:{full_text}")
             preview_parts.append(f"文本:{full_text[:30]}")
-            if not media_contents:  # 纯文字消息
+            if not media_contents:
                 message_type = "text"
 
-        # 添加媒体内容
         if media_contents:
             content_parts.extend(media_contents)
-            # 统计各种媒体类型
             media_types = []
             for media in media_contents:
                 media_type = media.split(":", 1)[0]
                 if media_type not in media_types:
                     media_types.append(media_type)
 
-            type_names = {
-                "image": "图片",
-                "video": "视频",
-                "record": "语音",
-            }
+            type_names = {"image": "图片", "video": "视频", "record": "语音"}
             media_display = "+".join([type_names.get(t, t) for t in media_types])
             preview_parts.append(media_display)
 
-            if not text_contents:  # 纯媒体消息
+            if not text_contents:
                 message_type = media_types[0] if len(media_types) == 1 else "mixed"
 
         if content_parts:
-            # 使用所有内容部分生成哈希值
-            content_hash = "|".join(sorted(content_parts))  # 排序确保一致性
+            content_hash = "|".join(sorted(content_parts))
             preview = "+".join(preview_parts)
             return content_hash, message_type, preview
 
         return None
-
-    def _get_component_type(self, segment) -> str:
-        """获取消息组件类型"""
-        try:
-            if hasattr(segment, "type"):
-                component_type = getattr(segment, "type")
-                if hasattr(component_type, "value"):
-                    return str(component_type.value).lower()
-                else:
-                    return str(component_type).lower()
-            return segment.__class__.__name__.lower()
-        except Exception:
-            return "unknown"
 
     def _get_text_content(self, segment) -> str:
         """获取文本组件的内容"""
@@ -288,6 +254,7 @@ class DuplicateDetector:
             result = await self.bot.api.call_action(
                 "get_forward_msg", message_id=forward_id
             )
+
             if not result:
                 return None
 
@@ -386,19 +353,11 @@ class DuplicateDetector:
             logger.error(f"检测广告内容时发生错误: {e}")
             return False
 
-    async def _recall_user_message(self, message_id: str):
-        """撤回用户消息"""
-        try:
-            if message_id:
-                await self.bot.api.call_action("delete_msg", message_id=message_id)
-        except Exception as e:
-            logger.error(f"撤回用户消息失败: {e}")
-
     async def _handle_ban_and_warning(
         self,
         group_id: int,
         user_id: int,
-        message_chain: list,
+        message_id: str,
         ban_duration: int,
         warning_msg: str,
     ):
@@ -419,10 +378,10 @@ class DuplicateDetector:
 
             # 安排撤回警告消息
             if isinstance(send_result, dict) and send_result.get("message_id"):
-                message_id = send_result["message_id"]
-                task_key = f"{group_id}_{message_id}"
+                warning_message_id = send_result["message_id"]
+                task_key = f"{group_id}_{warning_message_id}"
                 self._reminder_tasks[task_key] = asyncio.create_task(
-                    self._recall_reminder(message_id, task_key)
+                    self._recall_reminder(warning_message_id, task_key)
                 )
 
         except Exception as e:
@@ -444,8 +403,8 @@ class DuplicateDetector:
     async def _recall_reminder(self, message_id: int, task_key: str):
         """撤回提醒消息"""
         try:
-            await asyncio.sleep(60)
-            await self.bot.api.call_action("delete_msg", message_id=message_id)
+            await asyncio.sleep(WARNING_RECALL_DELAY)
+            await self.recall_message(str(message_id))
         except Exception as e:
             logger.error(f"撤回消息失败: {e}")
         finally:
@@ -455,7 +414,7 @@ class DuplicateDetector:
         """定期清理过期记录"""
         while True:
             try:
-                await asyncio.sleep(3600)
+                await asyncio.sleep(DB_CLEANUP_INTERVAL)
                 await self.message_record.cleanup_old_records()
             except asyncio.CancelledError:
                 break
